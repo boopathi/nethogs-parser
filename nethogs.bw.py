@@ -19,6 +19,7 @@ def watch():
 				time.sleep(0.5)
 			except (KeyboardInterrupt, SystemExit):
 				yield(False)
+
 count = 0
 for l in watch():
 	if l == False:
