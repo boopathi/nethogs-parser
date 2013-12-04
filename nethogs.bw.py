@@ -25,19 +25,19 @@ class NH:
     if len(l) != 3: return False
     d = l[0].split('/')
     if len(d) < 3: return False
-    self.count += 1
     ld['sent'] = float(l[1])
     ld['recv'] = float(l[2])
-    ld['prog'] = '/'.join(d[0:-2])
+    ld['prog'] = '/'.join(d)
     ld['pid']  = d[-2]
     ld['uid']  = d[-1]
     return ld
 
   def run(self):
     for l in watch():
+      self.count += 1
       if l == False: break
-      line = parseline(l)
-      if line == False: break
+      line = self.parseline(l)
+      if line == False: continue
       if not self.data.has_key(line['prog']):
         self.data[line['prog']] = (0.0,0.0)
       zipped = zip(self.data[line['prog']], (line['sent'],line['recv']))
@@ -47,7 +47,7 @@ class NH:
     self.runcomplete = True
 
   def progress(self):
-    print '\r>> %d seconds remaining; %d lines processed' % (timeout - time.time(), count),
+    print '\r>> %d seconds remaining; %d lines processed' % (self.timeout - time.time(), self.count),
     sys.stdout.flush()
 
   def get(self):
@@ -61,19 +61,26 @@ class NH:
     return item
 
   def pp(self):
+    print
     if not self.runcomplete:
       print "call method run to populate data"
       return
     else:
       for prog in self.data:
-        sent = self.data['prog'][0]
-        recv = self.data['prog'][1]
-        print self.fmtitem(prog),
+        sent = self.data[prog][0]
+        recv = self.data[prog][1]
+        ud = prog.split('/')
+        user = ud[-1]
+        proc = ud[-2]
+        print self.fmtitem(user)
+        print self.fmtitem(proc)
         print self.fmtitem(sent),
-        print self.fmtitem(recv)
+        print self.fmtitem(recv),
+        print self.fmtitem(prog)
 
 if __name__ == "__main__":
   d = NH(timeout=60, showprogress=True)
   d.run()
-  data = d.get()
+  d.pp()
+
 
