@@ -6,8 +6,11 @@ import (
   "bufio"
   "os"
   "log"
+  "io/ioutil"
   "strings"
   "strconv"
+  "net/http"
+  "net/url"
 )
 
 type pt struct {
@@ -32,10 +35,18 @@ func check(err error) {
   }
 }
 
+//flags
+var (
+  filename,datatable string
+  pprint bool
+)
+
 func main() {
   data = map[string]pt {}
+  flag.StringVar(&datatable, "datatable", "", "Datatable server details")
+  flag.BoolVar(&pprint, "prettyprint", false, "Pretty Print")
   flag.Parse()
-  filename := flag.Args()[0]
+  filename = flag.Args()[0]
   file, err := os.Open(filename)
   check(err)
   scanner := bufio.NewScanner(file)
@@ -45,7 +56,12 @@ func main() {
   if err = scanner.Err(); err != nil {
     log.Fatal(err)
   }
-  prettyprint()
+  if pprint {
+    prettyprint()
+  }
+  if datatable != "" {
+    send_to_datatable()
+  }
 }
 
 func parseline(line string) {
@@ -69,4 +85,32 @@ func prettyprint() {
   for proc, _ := range data {
     fmt.Printf("%40s\t%10.2f\t%10.2f\n", proc, data[proc].sent, data[proc].recv)
   }
+}
+
+func getcsv() string{
+  csv := ""
+  hostname,_ := os.Hostname()
+  for proc, _ := range data {
+    csv = csv + fmt.Sprintf("%s,%.2f,%.2f,%s,%s\n",
+      proc, data[proc].sent, data[proc].recv,filename,hostname)
+  }
+  return csv
+}
+
+func send_to_datatable() {
+  classname := "nethogs"
+  hostname, _ := os.Hostname()
+  params := url.Values{}
+  params.Set("class", classname)
+  params.Set("host", hostname)
+  params.Set("data", getcsv())
+  if strings.Index(datatable, "http://") != 0 {
+    datatable = "http://" + datatable
+  }
+  resp, err := http.PostForm(datatable + "/api/put", params)
+  check(err)
+  defer resp.Body.Close()
+  body, err := ioutil.ReadAll(resp.Body)
+  check(err)
+  fmt.Println(string(body))
 }
