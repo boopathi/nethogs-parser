@@ -3,13 +3,16 @@
 import time,sys
 
 def watch():
-  while True:
-    try: new = raw_input()
-    except (EOFError, KeyboardInterrupt, SystemExit): yield(False)
-    if new: yield(new)
-    else:
-      try: time.sleep(0.5)
-      except (KeyboardInterrupt, SystemExit): yield(False)
+  f = open(sys.argv[1])
+  for line in f:
+    yield line
+  #while True:
+  #  try: new = raw_input()
+  #  except (EOFError, KeyboardInterrupt, SystemExit): yield(False)
+  #  if new: yield(new)
+  #  else:
+  #    try: time.sleep(0.5)
+  #    except (KeyboardInterrupt, SystemExit): yield(False)
 
 class NH:
   def __init__(self, timeout=60, showprogress=False):
@@ -72,8 +75,8 @@ class NH:
         ud = prog.split('/')
         user = ud[-1]
         proc = ud[-2]
-        print self.fmtitem(user)
-        print self.fmtitem(proc)
+        print self.fmtitem(user),
+        print self.fmtitem(proc),
         print self.fmtitem(sent),
         print self.fmtitem(recv),
         print self.fmtitem(prog)
