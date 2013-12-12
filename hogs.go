@@ -50,9 +50,7 @@ func main() {
 
 func parseline(line string) {
   l := strings.Fields(line)
-  if len(l) < 3 {
-    return
-  }
+  if len(l) < 3 { return }
   recv, err := strconv.ParseFloat(l[len(l)-1],64)
   if err != nil { return }
   sent, err := strconv.ParseFloat(l[len(l)-2],64)
@@ -61,13 +59,14 @@ func parseline(line string) {
   processdata := strings.Split(processCol, "/")
   if len(processdata) < 3 { return }
   pname := strings.Join(processdata[0:len(processdata)-2], "/")
-  pname = strings.Split(pname, ":")[0]
+  if strings.Index(pname, ":") != -1 && strings.Index(pname, "-") != -1 {
+    pname = strings.Split(pname, "-")[0]
+  }
   adddata(pname, pt{ sent, recv })
 }
 
-
 func prettyprint() {
   for proc, _ := range data {
-    fmt.Printf("%s\t%f\t%f\n", proc, data[proc].sent, data[proc].recv)
+    fmt.Printf("%40s\t%10.2f\t%10.2f\n", proc, data[proc].sent, data[proc].recv)
   }
 }
