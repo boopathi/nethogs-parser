@@ -38,7 +38,10 @@ type pt struct {
   users set
 }
 
-var data map[string]pt
+type DATA struct {
+  val map[string]pt
+  filename string
+}
 
 func check(err error) {
   if err != nil {
@@ -48,34 +51,44 @@ func check(err error) {
 
 //flags
 var (
-  filename,datatable string
+  datatable string
   pprint bool
 )
 
+var collection []DATA
+
 func main() {
-  data = map[string]pt {}
   flag.StringVar(&datatable, "datatable", "", "Datatable server details")
   flag.BoolVar(&pprint, "pp", false, "Pretty Print")
   flag.Parse()
-  filename = flag.Args()[0]
-  file, err := os.Open(filename)
-  check(err)
-  scanner := bufio.NewScanner(file)
-  for scanner.Scan() {
-    parseline(scanner.Text())
-  }
-  if err = scanner.Err(); err != nil {
-    log.Fatal(err)
-  }
-  if pprint {
-    prettyprint()
+  collection = make([]DATA, 1)
+  for i:=0; i<flag.NArg(); i++ {
+    filename := flag.Args()[i]
+    data := DATA{ map[string]pt{}, filename }
+    file, err := os.Open(filename)
+    check(err)
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+      data.parseline(scanner.Text())
+    }
+    if err = scanner.Err(); err != nil {
+      fmt.Println(err)
+      continue
+    }
+    collection = append(collection, data)
+    if pprint {
+      data.prettyprint()
+    } else {
+      log.Print("[DONE] " + filename)
+    }
   }
   if datatable != "" {
     send_to_datatable()
   }
 }
 
-func parseline(line string) {
+func (d DATA) parseline(line string) {
+  data := d.val
   l := strings.Fields(line)
   if len(l) < 3 { return }
   recv, err := strconv.ParseFloat(l[len(l)-1],64)
@@ -100,21 +113,25 @@ func parseline(line string) {
   }
 }
 
-func prettyprint() {
+func (d DATA) prettyprint() {
+  fmt.Printf("Output for file = %s\n\n", d.filename)
+  data := d.val
   for proc, _ := range data {
     fmt.Printf("%40s\t%10.2f\t%10.2f\t%40s\n", proc, data[proc].sent, data[proc].recv,
       strings.Join(data[proc].users.get(), ",") )
   }
+  fmt.Printf("\n\n")
 }
 
-func getcsv() string{
+func (d DATA) getcsv() string{
+  data := d.val
   csv := ""
   hostname,_ := os.Hostname()
   for proc, _ := range data {
     csv = csv + fmt.Sprintf("%s,%.2f,%.2f,%s,%s,%s\n",
       proc, data[proc].sent, data[proc].recv,
       strings.Join(data[proc].users.get(), " "),
-      filename,hostname)
+      d.filename,hostname)
   }
   return csv
 }
@@ -125,7 +142,11 @@ func send_to_datatable() {
   params := url.Values{}
   params.Set("class", classname)
   params.Set("host", hostname)
-  params.Set("data", getcsv())
+  csvdata := ""
+  for i := range collection {
+    csvdata = csvdata + collection[i].getcsv()
+  }
+  params.Set("data", csvdata)
   if strings.Index(datatable, "http://") != 0 {
     datatable = "http://" + datatable
   }
