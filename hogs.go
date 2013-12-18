@@ -52,14 +52,14 @@ func check(err error) {
 //flags
 var (
   datatable string
-  pprint bool
+  ptype string
 )
 
 var collection []DATA
 
 func main() {
   flag.StringVar(&datatable, "datatable", "", "Datatable server details")
-  flag.BoolVar(&pprint, "pp", false, "Pretty Print")
+  flag.StringVar(&ptype, "type", "", "How to print the data to STDOUT")
   flag.Parse()
   collection = make([]DATA, 1)
   for i:=0; i<flag.NArg(); i++ {
@@ -76,8 +76,10 @@ func main() {
       continue
     }
     collection = append(collection, data)
-    if pprint {
+    if ptype == "pretty" {
       data.prettyprint()
+    } else if ptype == "csv" {
+      fmt.Print(data.getcsv())
     } else {
       log.Print("[DONE] " + filename)
     }
