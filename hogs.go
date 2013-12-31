@@ -12,7 +12,8 @@ import (
   "strconv"
   "net/http"
   "net/url"
-  "sync"
+  "time"
+  _ "sync"
   "runtime/pprof"
 )
 
@@ -54,23 +55,15 @@ func check(err error) {
 //flags
 var (
   datatable string
+  datatableclass string
   ptype string
   cpuprofile string
 )
 
-// Collections - Its mutexes and related vars
-// this is a global var because we are not passing
-// this as a value to "send_to_datatable".
-// No other function uses this.
-// You can safely use this inside main if you'd like to.
-var (
-  collection []DATA
-  wg sync.WaitGroup
-  collectionAccess sync.Mutex
-)
-
 func main() {
+  start := time.Now()
   flag.StringVar(&datatable, "datatable", "", "Datatable server details")
+  flag.StringVar(&datatableclass, "class", "nethogs", "Classname for Datatable")
   flag.StringVar(&ptype, "type", "", "How to print the data to STDOUT")
   flag.StringVar(&cpuprofile, "cpuprofile", "", "Write CPU Profile to file")
   flag.Parse()
@@ -80,34 +73,26 @@ func main() {
     pprof.StartCPUProfile(f)
     defer pprof.StopCPUProfile()
   }
-  collection = make([]DATA, 1)
+  collection := make([]DATA, 1)
   // A channel for sending and receiving values
-  dchan := make([]chan DATA, flag.NArg()+1)
+  dchan := make(chan DATA, flag.NArg()+1)
   for i:=0; i<flag.NArg(); i++ {
     filename := flag.Args()[i]
-    dchan[i] = make(chan DATA)
-    wg.Add(1)
-    // Create 2*flag.NArg() go routines.
-    // flag.NArg() go routines parse the files.
-    // The remaining flag.NArg() go routines wait for
-    // the output on the unbuffered channel dchan.
-    go parsefile(filename,dchan[i])
-    go func(wg *sync.WaitGroup,i int){
-      defer wg.Done()
-      data := <-dchan[i]
-      collection = append(collection, data)
-      if ptype == "pretty" {
-        data.prettyprint()
-      } else if ptype == "csv" {
-        fmt.Print(data.getcsv())
-      } else {
-        log.Print("[DONE] " + filename)
-      }
-    }(&wg,i)
+    go parsefile(filename,dchan)
   }
-  wg.Wait()
+  for i:=0; i<flag.NArg(); i++ {
+    data := <-dchan
+    collection = append(collection, data)
+    if ptype == "pretty" {
+      data.prettyprint()
+    } else if ptype == "csv" {
+      fmt.Print(data.getcsv())
+    } else {
+      log.Printf("[DONE] [%s] %s", time.Since(start), data.filename)
+    }
+  }
   if datatable != "" {
-    send_to_datatable()
+    send_to_datatable(collection)
   }
 }
 
@@ -176,11 +161,10 @@ func (d DATA) getcsv() string{
   return csv
 }
 
-func send_to_datatable() {
-  classname := "nethogs"
+func send_to_datatable(collection []DATA) {
   hostname, _ := os.Hostname()
   params := url.Values{}
-  params.Set("class", classname)
+  params.Set("class", datatableclass)
   params.Set("host", hostname)
   csvdata := ""
   for i := range collection {
