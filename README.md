@@ -23,9 +23,3 @@ Nethogs is a `net top` tool. [http://nethogs.sourceforge.net/]
 + `./hogs -type=csv output1 output2 output3`
 + `./hogs -datatable localhost:4200 -class nethogsbw output1 output2`
 + `./hogs -type=pretty -datatable localhost:4200 -class mynethogs output1`
-
-## Listen on nethogs output for some <timeout>  - Python
-
-+ `nethogs -t eth1 | python nethogs.bw.py 3600`
-+ # Nethogs listens on eth1 and pipes output to nethogs.bw.py which parses them and aggregates the data
-+ # After `3600s`, the python program exits sending quit signal to nethogs too, and prints the output
