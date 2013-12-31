@@ -8,7 +8,7 @@ Nethogs is a `net top` tool. [http://nethogs.sourceforge.net/]
 
 # Make
 
-+ `go build hogs.go`
++ `go build -o hogs hogs.go`
 
 # Usage - go script
 
