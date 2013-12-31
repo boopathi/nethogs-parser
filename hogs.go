@@ -12,6 +12,8 @@ import (
   "strconv"
   "net/http"
   "net/url"
+  "sync"
+  "runtime/pprof"
 )
 
 type set map[string]struct{}
@@ -53,40 +55,76 @@ func check(err error) {
 var (
   datatable string
   ptype string
+  cpuprofile string
 )
 
-var collection []DATA
+// Collections - Its mutexes and related vars
+// this is a global var because we are not passing
+// this as a value to "send_to_datatable".
+// No other function uses this.
+// You can safely use this inside main if you'd like to.
+var (
+  collection []DATA
+  wg sync.WaitGroup
+  collectionAccess sync.Mutex
+)
 
 func main() {
   flag.StringVar(&datatable, "datatable", "", "Datatable server details")
   flag.StringVar(&ptype, "type", "", "How to print the data to STDOUT")
+  flag.StringVar(&cpuprofile, "cpuprofile", "", "Write CPU Profile to file")
   flag.Parse()
+  if cpuprofile != "" {
+    f, err := os.Create(cpuprofile)
+    if err != nil { log.Fatal(err) }
+    pprof.StartCPUProfile(f)
+    defer pprof.StopCPUProfile()
+  }
   collection = make([]DATA, 1)
+  // A channel for sending and receiving values
+  dchan := make([]chan DATA, flag.NArg()+1)
   for i:=0; i<flag.NArg(); i++ {
     filename := flag.Args()[i]
-    data := DATA{ map[string]pt{}, filename }
-    file, err := os.Open(filename)
-    check(err)
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-      data.parseline(scanner.Text())
-    }
-    if err = scanner.Err(); err != nil {
-      fmt.Println(err)
-      continue
-    }
-    collection = append(collection, data)
-    if ptype == "pretty" {
-      data.prettyprint()
-    } else if ptype == "csv" {
-      fmt.Print(data.getcsv())
-    } else {
-      log.Print("[DONE] " + filename)
-    }
+    dchan[i] = make(chan DATA)
+    wg.Add(1)
+    // Create 2*flag.NArg() go routines.
+    // flag.NArg() go routines parse the files.
+    // The remaining flag.NArg() go routines wait for
+    // the output on the unbuffered channel dchan.
+    go parsefile(filename,dchan[i])
+    go func(wg *sync.WaitGroup,i int){
+      defer wg.Done()
+      data := <-dchan[i]
+      collection = append(collection, data)
+      if ptype == "pretty" {
+        data.prettyprint()
+      } else if ptype == "csv" {
+        fmt.Print(data.getcsv())
+      } else {
+        log.Print("[DONE] " + filename)
+      }
+    }(&wg,i)
   }
+  wg.Wait()
   if datatable != "" {
     send_to_datatable()
   }
+}
+
+// This will be called from a go routine
+func parsefile(filename string, d chan DATA) {
+  data := DATA{ map[string]pt{}, filename }
+  file, err := os.Open(filename)
+  check(err)
+  scanner := bufio.NewScanner(file)
+  for scanner.Scan() {
+    data.parseline(scanner.Text())
+  }
+  if err = scanner.Err(); err != nil {
+    log.Print(err)
+    d <- data
+  }
+  d <- data
 }
 
 func (d DATA) parseline(line string) {
