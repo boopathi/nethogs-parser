@@ -13,7 +13,7 @@ import (
   "net/http"
   "net/url"
   "time"
-  _ "sync"
+  "runtime"
   "runtime/pprof"
 )
 
@@ -61,6 +61,7 @@ var (
 )
 
 func main() {
+  runtime.GOMAXPROCS(runtime.NumCPU())
   start := time.Now()
   flag.StringVar(&datatable, "datatable", "", "Datatable server details")
   flag.StringVar(&datatableclass, "class", "nethogs", "Classname for Datatable")
