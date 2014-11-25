@@ -1,7 +1,4 @@
 box: wercker/golang
-build:
-    steps:
-      - go-install
 
 
 
