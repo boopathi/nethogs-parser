@@ -1,1 +1,7 @@
-box: wercker/default
+box: wercker/golang
+build:
+    steps:
+      - go-install
+
+
+
